@@ -1,42 +1,73 @@
-import requests
-import subprocess
-from concurrent.futures import ThreadPoolExecutor, as_completed
+# pylint: disable=invalid-name, missing-module-docstring
+# pylint: disable=bad-indentation, line-too-long, trailing-whitespace
+# pylint: disable=missing-function-docstring, unused-variable, unbalanced-tuple-unpacking, wrong-import-order
+import asyncio
+import re
+from fuzzywuzzy import process
+from emoji import EMOJI_DATA
+from deep_translator import GoogleTranslator
+import lyricsgenius
+import os
 
-def get_subdomains_hackertarget(domain):
-    url = f"https://api.hackertarget.com/hostsearch/?q={domain}"
-    try:
-        res = requests.get(url)
-        if res.status_code != 200:
-            print("[-] API request failed.")
-            return []
-        return [line.split(',')[0] for line in res.text.splitlines()]
-    except Exception as e:
-        print(f"[-] Exception occurred: {e}")
-        return []
+emoji_keywords = []
+emoji_map = {}
 
-def check_subdomain(subdomain):
-    try:
-        result = subprocess.run(["curl", subdomain, "-v", "--max-time", "5"], capture_output=True, text=True)
-        if len(result.stderr) >= 200:
-            return f"✅ {subdomain} - responsive"
-        else:
-            return f"⚠️ {subdomain} - response too short"
-    except subprocess.TimeoutExpired:
-        return f"⏰ {subdomain} - request timed out"
-    except Exception as e:
-        return f"❌ {subdomain} - error: {e}"
+for emj, data in EMOJI_DATA.items():
+	keywords = data.get("en", "")
+	if isinstance(keywords, str):
+		keywords = keywords.split()
+	for kw in keywords:
+		emoji_keywords.append(kw)
+		emoji_map[kw] = emj
+
+genius = lyricsgenius.Genius("N8_ueLWGTvss_0tZIruMSFdtUhYiU2hPr63LMAI9c7fMD0f-Z92P8uVcHS4Phv9S", timeout=15)
+genius.verbose = False
+
+
+async def get_song(title, artist):
+	song = genius.search_song(title, artist)
+	if song:
+		os.makedirs("lyrics", exist_ok=True)
+		path = f"lyrics/{title}.txt"
+		with open(path, "w", encoding="utf_8") as f:
+			f.write(song.lyrics)
+		return path
+	return None
+
+
+def translate_to_english(word, src_lang='auto'):
+	return GoogleTranslator(source=src_lang, target='en').translate(word).lower()
+
+
+def match_emoji(line):
+	match = re.search(r"\b\w+\b(?=\s*$)", line, re.UNICODE)
+	if match:
+		last_word = match.group()
+		translated = translate_to_english(last_word)
+		best_match, _ = process.extractOne(translated, emoji_keywords)
+		emoji_char = emoji_map.get(best_match)
+		return last_word, emoji_char
+	return None, None
+
+
+async def main():
+	title = input("🌍 PLEASE ENTER TITLE'S NAME:\n")
+	artist = input("🌍 PLEASE ENTER ARTIST'S NAME:\n")
+	
+	path = await get_song(title, artist)
+	if not path:
+		print("❌ Song not found.")
+		return
+	
+	with open(path, "r", encoding="utf_8") as f:
+		for line in f:
+			line = line.strip()
+			if not line:
+				continue
+			word, translated, emoji_char = match_emoji(line)
+			if emoji_char:
+				print(f"{line} {emoji_char}")
+
 
 if __name__ == "__main__":
-    domain = input("Please enter a valid domain (e.g., example.com): ").strip()
-    subdomains = get_subdomains_hackertarget(domain)
-
-    if not subdomains:
-        print("No subdomains found or API error.")
-    else:
-        print(f"Found {len(subdomains)} subdomains. Checking responsiveness...")
-
-        with ThreadPoolExecutor(max_workers=10) as executor:
-            futures = [executor.submit(check_subdomain, sub) for sub in subdomains]
-
-            for future in as_completed(futures):
-                print(future.result())
+	asyncio.run(main())
