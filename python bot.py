@@ -2,13 +2,13 @@
 """
 Telegram bot for Fidelio - Image encryption & decryption
 """
-
+import os
 import telebot
 import main
 import main2
 
 
-API_TOKEN = "7959422543:AAE7Ciy_AnFUm3b3Cr11HwSOiDtS43DTykI"
+API_TOKEN = os.environ.get("7959422543:AAE7Ciy_AnFUm3b3Cr11HwSOiDtS43DTykI")
 bot = telebot.TeleBot(API_TOKEN)
 
 @bot.message_handler(commands=['start'])
