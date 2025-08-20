@@ -3,8 +3,8 @@ from PIL import Image
 def encode_message_in_image(img: Image.Image, psypher: str) -> Image.Image:
     img = img.convert("RGB")
 
-    message = psypher + "<END>"
-    binary = ''.join(format(ord(c), '08b') for c in message)
+    message_bytes = (psypher + "<END>").encode("utf-8")
+    binary = ''.join(f'{byte:08b}' for byte in message_bytes)
 
     data_index = 0
     width, height = img.size
@@ -19,5 +19,5 @@ def encode_message_in_image(img: Image.Image, psypher: str) -> Image.Image:
             pixels[x, y] = (r, g, b)
             data_index += 1
 
-    return img  # Modified image with embedded message
+    return img
 

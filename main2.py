@@ -5,20 +5,21 @@ def decode_message_from_image(img: Image.Image) -> str:
     width, height = img.size
     pixels = img.load()
     binary = ''
-    chars = ''
+    byte_list = []
 
     for y in range(height):
         for x in range(width):
             r, g, b = pixels[x, y]
             binary += str(r & 1)
 
-            if len(binary) >= 8:
+            while len(binary) >= 8:
                 byte = binary[:8]
                 binary = binary[8:]
-                char = chr(int(byte, 2))
-                chars += char
+                byte_list.append(int(byte, 2))
 
-                if chars.endswith("<END>"):
-                    return chars[:-5]
+    message_bytes = bytes(byte_list)
+    message = message_bytes.decode("utf-8", errors="ignore")
 
-    return chars
+    if "<END>" in message:
+        return message.split("<END>")[0]
+    return message
